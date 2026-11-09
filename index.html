@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>стильный видеоплеер · загрузка и просмотр</title>
+  <title>видеоплеер · ambient light</title>
   <style>
     * {
       margin: 0;
@@ -12,37 +12,76 @@
       user-select: none;
     }
 
+    html, body {
+      width: 100%;
+      height: 100%;
+    }
+
     body {
-      background: linear-gradient(145deg, #0b0f15 0%, #1a1f2b 100%);
+      background: #000;
       min-height: 100vh;
       display: flex;
       justify-content: center;
       align-items: center;
       font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      padding: 20px;
+      padding: 40px 20px;
+      overflow: hidden;
+      position: relative;
     }
 
-    /* главная карточка плеера */
+    /* ---------- AMBIENT LIGHT (свечение от видео, как на YouTube) ---------- */
+    .ambient-wrapper {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* слой со свечением, который растягивается и размывается */
+    .ambient-glow {
+      position: absolute;
+      inset: -20%;
+      background-size: cover;
+      background-position: center;
+      filter: blur(120px) saturate(220%) brightness(0.85);
+      opacity: 0;
+      transform: scale(1.15);
+      transition: opacity 0.8s ease;
+      will-change: opacity, background-image;
+    }
+
+    /* затемняющая вуаль, чтобы свечение не было слишком ярким */
+    .ambient-overlay {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(
+        ellipse at center,
+        rgba(0, 0, 0, 0.1) 0%,
+        rgba(0, 0, 0, 0.55) 60%,
+        rgba(0, 0, 0, 0.92) 100%
+      );
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* ---------- ПЛЕЕР ---------- */
     .player-card {
       width: 100%;
-      max-width: 1100px;
-      background: rgba(18, 22, 28, 0.75);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border-radius: 42px;
-      padding: 24px;
-      box-shadow: 0 30px 50px -15px rgba(0, 0, 0, 0.7),
-                  0 0 0 1px rgba(255, 255, 255, 0.04) inset;
-      transition: all 0.3s ease;
+      max-width: 1200px;
+      position: relative;
+      z-index: 2;
+      transition: transform 0.3s ease;
     }
 
-    /* контейнер для видео и оверлеев */
     .video-container {
       position: relative;
-      border-radius: 32px;
+      border-radius: 20px;
       overflow: hidden;
-      background: #0a0c10;
-      box-shadow: 0 20px 35px -8px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+      background: #0a0a0a;
+      box-shadow:
+        0 40px 80px -20px rgba(0, 0, 0, 0.9),
+        0 0 0 1px rgba(255, 255, 255, 0.05);
       aspect-ratio: 16 / 9;
     }
 
@@ -52,21 +91,20 @@
       height: 100%;
       object-fit: contain;
       background: #000;
-      transition: opacity 0.2s;
       outline: none;
     }
 
-    /* кастомные контролы – плавные, стеклянные */
+    /* ---------- КАСТОМНЫЕ КОНТРОЛЫ ---------- */
     .custom-controls {
       position: absolute;
       bottom: 0;
       left: 0;
       right: 0;
-      background: linear-gradient(to top, rgba(5, 8, 12, 0.9) 0%, rgba(5, 8, 12, 0.5) 40%, transparent 100%);
-      padding: 32px 20px 18px 20px;
+      background: linear-gradient(to top, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.6) 50%, transparent 100%);
+      padding: 40px 20px 16px 20px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 12px;
       opacity: 0;
       transition: opacity 0.25s ease;
       pointer-events: none;
@@ -74,7 +112,8 @@
     }
 
     .video-container:hover .custom-controls,
-    .custom-controls.active {
+    .custom-controls.active,
+    .video-container:focus-within .custom-controls {
       opacity: 1;
       pointer-events: auto;
     }
@@ -83,22 +122,18 @@
     .progress-area {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 14px;
     }
 
     .time-display {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 500;
-      color: #eef3fc;
-      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+      color: #fff;
       letter-spacing: 0.3px;
-      background: rgba(0, 0, 0, 0.3);
-      backdrop-filter: blur(4px);
-      padding: 5px 12px;
-      border-radius: 40px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
       white-space: nowrap;
       font-variant-numeric: tabular-nums;
+      opacity: 0.9;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
     }
 
     .progress-slider-container {
@@ -112,92 +147,83 @@
       -webkit-appearance: none;
       appearance: none;
       width: 100%;
-      height: 5px;
-      background: rgba(255, 255, 255, 0.2);
+      height: 4px;
+      background: rgba(255, 255, 255, 0.25);
       border-radius: 20px;
       outline: none;
       cursor: pointer;
-      transition: background 0.2s;
-      box-shadow: 0 0 8px rgba(0, 0, 0, 0.3);
+      transition: height 0.15s;
+    }
+
+    input[type="range"]:hover {
+      height: 6px;
     }
 
     input[type="range"]::-webkit-slider-thumb {
       -webkit-appearance: none;
       appearance: none;
-      width: 16px;
-      height: 16px;
-      background: white;
+      width: 14px;
+      height: 14px;
+      background: #ff0000;
       border-radius: 50%;
-      box-shadow: 0 2px 10px rgba(0, 180, 255, 0.7), 0 0 0 2px rgba(255, 255, 255, 0.5);
       transition: transform 0.15s, box-shadow 0.15s;
       border: none;
-      cursor: grab;
+      cursor: pointer;
+      box-shadow: 0 0 8px rgba(255, 0, 0, 0.6);
     }
 
     input[type="range"]::-webkit-slider-thumb:hover {
-      transform: scale(1.2);
-      box-shadow: 0 0 18px #3b9eff, 0 0 0 3px rgba(255, 255, 255, 0.8);
-    }
-
-    input[type="range"]::-webkit-slider-thumb:active {
-      cursor: grabbing;
-      transform: scale(1.1);
+      transform: scale(1.4);
+      box-shadow: 0 0 14px rgba(255, 0, 0, 0.9);
     }
 
     input[type="range"]::-moz-range-thumb {
-      width: 16px;
-      height: 16px;
-      background: white;
+      width: 14px;
+      height: 14px;
+      background: #ff0000;
       border-radius: 50%;
       border: none;
-      box-shadow: 0 2px 10px rgba(0, 180, 255, 0.7);
       cursor: pointer;
     }
 
-    /* панель с кнопками */
+    /* панель кнопок */
     .buttons-panel {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      flex-wrap: wrap;
       gap: 12px;
     }
 
     .left-buttons, .right-buttons {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 8px;
       flex-wrap: wrap;
     }
 
     .icon-btn {
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      backdrop-filter: blur(8px);
-      width: 44px;
-      height: 44px;
+      background: transparent;
+      border: none;
+      width: 40px;
+      height: 40px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      color: #f0f5ff;
-      transition: all 0.2s cubic-bezier(0.2, 0.9, 0.4, 1);
-      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-      font-size: 20px;
+      color: #fff;
+      transition: background 0.2s, transform 0.15s;
       outline: none;
       flex-shrink: 0;
     }
 
     .icon-btn:hover {
-      background: rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.15);
       transform: scale(1.05);
-      border-color: rgba(255, 255, 255, 0.3);
-      color: white;
     }
 
     .icon-btn:active {
-      transform: scale(0.96);
+      transform: scale(0.92);
     }
 
     .icon-btn svg {
@@ -207,39 +233,77 @@
       display: block;
     }
 
+    /* большая кнопка play по центру */
+    .center-play-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      z-index: 5;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .center-play-overlay.visible {
+      opacity: 1;
+    }
+
+    .center-play-btn {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(10px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      pointer-events: auto;
+      border: 2px solid rgba(255, 255, 255, 0.25);
+      transition: transform 0.2s, background 0.2s;
+    }
+
+    .center-play-btn:hover {
+      background: rgba(255, 0, 0, 0.85);
+      transform: scale(1.08);
+    }
+
+    .center-play-btn svg {
+      width: 38px;
+      height: 38px;
+      fill: #fff;
+      margin-left: 4px;
+    }
+
     /* кнопка загрузки */
     .upload-label {
       display: flex;
       align-items: center;
-      gap: 10px;
-      background: linear-gradient(135deg, #2f6bff, #1e4bd2);
-      border: none;
-      padding: 0 24px;
-      height: 48px;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 0 18px;
+      height: 40px;
       border-radius: 40px;
-      font-weight: 600;
-      font-size: 15px;
-      color: white;
+      font-weight: 500;
+      font-size: 14px;
+      color: #fff;
       cursor: pointer;
       transition: all 0.2s;
-      box-shadow: 0 10px 18px -6px #0b2a7a;
-      letter-spacing: 0.3px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      white-space: nowrap;
     }
 
     .upload-label:hover {
-      background: linear-gradient(135deg, #3f7bff, #2a57e0);
-      transform: scale(1.02);
-      box-shadow: 0 14px 22px -8px #0f2f8a;
-    }
-
-    .upload-label:active {
-      transform: scale(0.98);
+      background: #ff0000;
+      border-color: #ff0000;
+      transform: scale(1.03);
     }
 
     .upload-label svg {
-      width: 20px;
-      height: 20px;
+      width: 18px;
+      height: 18px;
       fill: white;
     }
 
@@ -247,16 +311,11 @@
       display: none;
     }
 
-    /* громкость – необязательный слайдер, скрыт для простоты, но можно добавить */
     .volume-slider-container {
       display: flex;
       align-items: center;
-      gap: 8px;
-      background: rgba(255, 255, 255, 0.05);
-      padding: 0 16px 0 10px;
-      border-radius: 40px;
-      height: 44px;
-      border: 1px solid rgba(255, 255, 255, 0.06);
+      gap: 6px;
+      padding: 0 8px;
     }
 
     .volume-slider-container input {
@@ -264,79 +323,72 @@
       height: 4px;
     }
 
-    /* спрятанный нативный контрол */
-    video::-webkit-media-controls {
-      display: none !important;
+    .volume-slider-container input::-webkit-slider-thumb {
+      width: 12px;
+      height: 12px;
     }
 
+    /* имя файла */
+    .file-info {
+      font-size: 13px;
+      color: #888;
+      margin-top: 12px;
+      padding-left: 4px;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* скрываем нативные контролы */
+    video::-webkit-media-controls,
     video::-webkit-media-controls-enclosure {
       display: none !important;
     }
 
-    /* индикация загрузки файла */
-    .file-info {
-      font-size: 14px;
-      color: #aab9d4;
-      margin-top: 16px;
-      padding-left: 8px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      overflow: hidden;
-      white-space: nowrap;
-      text-overflow: ellipsis;
-    }
-
-    .file-info span {
-      background: rgba(255, 255, 255, 0.04);
-      padding: 6px 16px;
-      border-radius: 40px;
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      backdrop-filter: blur(4px);
-    }
-
-    /* адаптивность */
+    /* мобильная адаптация */
     @media (max-width: 700px) {
-      .player-card {
-        padding: 14px;
-        border-radius: 28px;
-      }
-      .video-container {
-        border-radius: 22px;
-      }
-      .custom-controls {
-        padding: 24px 12px 12px 12px;
-      }
-      .icon-btn {
-        width: 38px;
-        height: 38px;
-        font-size: 18px;
-      }
-      .upload-label {
-        padding: 0 16px;
-        height: 42px;
-        font-size: 13px;
-      }
-      .time-display {
-        font-size: 12px;
-        padding: 4px 8px;
-      }
-      .volume-slider-container {
-        display: none;
-      }
+      body { padding: 12px 8px; }
+      .video-container { border-radius: 12px; }
+      .custom-controls { padding: 30px 10px 8px 10px; gap: 6px; }
+      .icon-btn { width: 34px; height: 34px; }
+      .icon-btn svg { width: 18px; height: 18px; }
+      .upload-label { padding: 0 12px; height: 34px; font-size: 12px; }
+      .upload-label svg { width: 14px; height: 14px; }
+      .time-display { font-size: 11px; }
+      .volume-slider-container { display: none; }
+      .center-play-btn { width: 60px; height: 60px; }
+      .center-play-btn svg { width: 28px; height: 28px; }
+      .ambient-glow { filter: blur(60px) saturate(200%); }
     }
   </style>
 </head>
 <body>
+
+  <!-- ambient свечение позади плеера -->
+  <div class="ambient-wrapper">
+    <div class="ambient-glow" id="ambientGlow"></div>
+    <div class="ambient-overlay"></div>
+  </div>
+
+  <!-- плеер -->
   <div class="player-card">
     <div class="video-container" id="videoContainer">
-      <!-- сам видеоэлемент -->
-      <video id="video" preload="metadata" playsinline></video>
+      <video id="video" preload="metadata" playsinline crossorigin="anonymous"></video>
 
-      <!-- кастомные контролы -->
+      <!-- большая кнопка play по центру -->
+      <div class="center-play-overlay visible" id="centerPlayOverlay">
+        <div class="center-play-btn" id="centerPlayBtn">
+          <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        </div>
+      </div>
+
+      <!-- контролы -->
       <div class="custom-controls" id="customControls">
         <div class="progress-area">
-          <span class="time-display" id="timeDisplay">00:00 / 00:00</span>
+          <span class="time-display" id="timeDisplay">0:00 / 0:00</span>
           <div class="progress-slider-container">
             <input type="range" id="seekSlider" min="0" max="100" value="0" step="0.01">
           </div>
@@ -344,33 +396,18 @@
 
         <div class="buttons-panel">
           <div class="left-buttons">
-            <!-- play/pause -->
-            <button class="icon-btn" id="playPauseBtn" title="воспроизвести/пауза">
-              <svg id="playIcon" viewBox="0 0 24 24" width="24" height="24">
-                <path d="M8 5v14l11-7z"/>
-              </svg>
-              <svg id="pauseIcon" style="display: none;" viewBox="0 0 24 24" width="24" height="24">
-                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
-              </svg>
+            <button class="icon-btn" id="playPauseBtn" title="play/pause">
+              <svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+              <svg id="pauseIcon" style="display:none;" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
             </button>
-
-            <!-- перемотка на 5 сек назад -->
-            <button class="icon-btn" id="rewindBtn" title="назад 5 секунд">
-              <svg viewBox="0 0 24 24" width="24" height="24">
-                <path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/>
-              </svg>
+            <button class="icon-btn" id="rewindBtn" title="назад 5 сек">
+              <svg viewBox="0 0 24 24"><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/></svg>
             </button>
-
-            <!-- перемотка на 5 сек вперед -->
-            <button class="icon-btn" id="forwardBtn" title="вперёд 5 секунд">
-              <svg viewBox="0 0 24 24" width="24" height="24">
-                <path d="M13 6v12l8.5-6-8.5-6zM4 18l8.5-6L4 6v12z"/>
-              </svg>
+            <button class="icon-btn" id="forwardBtn" title="вперёд 5 сек">
+              <svg viewBox="0 0 24 24"><path d="M13 6v12l8.5-6-8.5-6zM4 18l8.5-6L4 6v12z"/></svg>
             </button>
-
-            <!-- громкость (дополнительно) -->
             <div class="volume-slider-container">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style="color:#ccd9f0;">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="#fff" style="opacity:0.85;">
                 <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
               </svg>
               <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="1">
@@ -378,27 +415,21 @@
           </div>
 
           <div class="right-buttons">
-            <!-- полноэкранный режим -->
             <button class="icon-btn" id="fullscreenBtn" title="полный экран">
-              <svg viewBox="0 0 24 24" width="24" height="24">
-                <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
-              </svg>
+              <svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
             </button>
-            <!-- загрузка видео -->
             <label for="fileInput" class="upload-label">
-              <svg viewBox="0 0 24 24" width="20" height="20">
-                <path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/>
-              </svg>
-              загрузить видео
+              <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>
+              загрузить
             </label>
             <input type="file" id="fileInput" accept="video/*">
           </div>
         </div>
       </div>
     </div>
-    <!-- строчка с именем файла -->
+
     <div class="file-info" id="fileInfo">
-      <span>📁 файл не выбран</span>
+      <span>файл не выбран</span>
     </div>
   </div>
 
@@ -418,192 +449,255 @@
       const volumeSlider = document.getElementById('volumeSlider');
       const customControls = document.getElementById('customControls');
       const videoContainer = document.getElementById('videoContainer');
+      const ambientGlow = document.getElementById('ambientGlow');
+      const centerPlayOverlay = document.getElementById('centerPlayOverlay');
+      const centerPlayBtn = document.getElementById('centerPlayBtn');
 
-      // форматирование времени
+      // ---------- форматы времени ----------
       function formatTime(seconds) {
-        if (isNaN(seconds) || seconds < 0) return '00:00';
+        if (isNaN(seconds) || seconds < 0) return '0:00';
         const h = Math.floor(seconds / 3600);
         const m = Math.floor((seconds % 3600) / 60);
         const s = Math.floor(seconds % 60);
-        if (h > 0) {
-          return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-        }
-        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        if (h > 0) return `${h}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+        return `${m}:${s.toString().padStart(2,'0')}`;
       }
 
-      // обновление слайдера и времени
       function updateProgress() {
         if (!video.duration || isNaN(video.duration)) {
-          timeDisplay.textContent = '00:00 / 00:00';
+          timeDisplay.textContent = '0:00 / 0:00';
           seekSlider.value = 0;
           return;
         }
         const percent = (video.currentTime / video.duration) * 100;
         seekSlider.value = percent;
-        const currentFormatted = formatTime(video.currentTime);
-        const totalFormatted = formatTime(video.duration);
-        timeDisplay.textContent = `${currentFormatted} / ${totalFormatted}`;
+        timeDisplay.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
       }
 
-      // перемотка по слайдеру
-      seekSlider.addEventListener('input', function(e) {
+      seekSlider.addEventListener('input', (e) => {
         const percent = parseFloat(e.target.value);
         if (video.duration && !isNaN(video.duration)) {
           video.currentTime = (percent / 100) * video.duration;
         }
       });
 
-      // обновляем прогресс при воспроизведении / загрузке / перемотке
       video.addEventListener('timeupdate', updateProgress);
       video.addEventListener('loadedmetadata', updateProgress);
       video.addEventListener('durationchange', updateProgress);
       video.addEventListener('seeked', updateProgress);
 
-      // play / pause кнопка
+      // ---------- play/pause ----------
       function togglePlayPause() {
-        if (video.paused) {
-          video.play().catch(() => {});
-        } else {
-          video.pause();
-        }
+        if (video.paused) video.play().catch(()=>{});
+        else video.pause();
       }
 
       playPauseBtn.addEventListener('click', togglePlayPause);
+      centerPlayBtn.addEventListener('click', togglePlayPause);
 
-      // синхронизация иконок play/pause
       video.addEventListener('play', () => {
         playIcon.style.display = 'none';
         pauseIcon.style.display = 'block';
+        centerPlayOverlay.classList.remove('visible');
       });
+
       video.addEventListener('pause', () => {
         playIcon.style.display = 'block';
         pauseIcon.style.display = 'none';
+        if (video.src) centerPlayOverlay.classList.add('visible');
       });
 
-      // перемотка на 5 секунд
+      // ---------- перемотка ----------
       rewindBtn.addEventListener('click', () => {
         video.currentTime = Math.max(0, video.currentTime - 5);
       });
-
       forwardBtn.addEventListener('click', () => {
-        if (video.duration) {
-          video.currentTime = Math.min(video.duration, video.currentTime + 5);
-        }
+        if (video.duration) video.currentTime = Math.min(video.duration, video.currentTime + 5);
       });
 
-      // полноэкранный режим
+      // ---------- fullscreen ----------
       fullscreenBtn.addEventListener('click', () => {
         if (!document.fullscreenElement) {
-          if (videoContainer.requestFullscreen) {
-            videoContainer.requestFullscreen();
-          } else if (videoContainer.webkitRequestFullscreen) {
-            videoContainer.webkitRequestFullscreen();
-          } else if (videoContainer.msRequestFullscreen) {
-            videoContainer.msRequestFullscreen();
-          }
+          const el = videoContainer;
+          (el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen).call(el);
         } else {
-          if (document.exitFullscreen) {
-            document.exitFullscreen();
-          } else if (document.webkitExitFullscreen) {
-            document.webkitExitFullscreen();
-          }
+          (document.exitFullscreen || document.webkitExitFullscreen).call(document);
         }
       });
 
-      // громкость
+      // ---------- громкость ----------
       volumeSlider.addEventListener('input', (e) => {
         video.volume = parseFloat(e.target.value);
-        if (video.volume === 0) {
-          video.muted = true;
-        } else {
-          video.muted = false;
+        video.muted = (video.volume === 0);
+      });
+
+      // ---------- AMBIENT LIGHT (YouTube-стиль) ----------
+      const ambientCanvas = document.createElement('canvas');
+      const ambientCtx = ambientCanvas.getContext('2d', { willReadFrequently: true });
+      let ambientInterval = null;
+      let lastGlowUpdate = 0;
+
+      function updateAmbientLight() {
+        if (!video.videoWidth || !video.videoHeight) return;
+        if (video.paused && video.currentTime === 0) return;
+
+        // уменьшенная копия кадра для анализа
+        ambientCanvas.width = 32;
+        ambientCanvas.height = 18;
+
+        try {
+          // рисуем кадр видео на канвасе
+          ambientCtx.drawImage(video, 0, 0, ambientCanvas.width, ambientCanvas.height);
+
+          // берём средний цвет через downscale
+          const imageData = ambientCtx.getImageData(0, 0, ambientCanvas.width, ambientCanvas.height);
+          const data = imageData.data;
+
+          let r = 0, g = 0, b = 0;
+          const count = data.length / 4;
+          // берём не все пиксели, для скорости — каждый 4-й
+          let sampled = 0;
+          for (let i = 0; i < data.length; i += 16) { // шаг 4 пикселя
+            r += data[i];
+            g += data[i+1];
+            b += data[i+2];
+            sampled++;
+          }
+          r = Math.round(r / sampled);
+          g = Math.round(g / sampled);
+          b = Math.round(b / sampled);
+
+          // немного усиливаем насыщенность
+          const max = Math.max(r, g, b);
+          const min = Math.min(r, g, b);
+          const satBoost = 1.4;
+          if (max > 0) {
+            r = Math.min(255, Math.round((r - min) * satBoost + min));
+            g = Math.min(255, Math.round((g - min) * satBoost + min));
+            b = Math.min(255, Math.round((b - min) * satBoost + min));
+          }
+
+          // устанавливаем цвет свечения (радиальное свечение + сам цвет)
+          ambientGlow.style.background = `radial-gradient(ellipse at center, rgb(${r},${g},${b}) 0%, rgba(${r},${g},${b},0.4) 40%, transparent 75%)`;
+          ambientGlow.style.opacity = '0.85';
+
+          // также создаём псевдо-свечение по краям через box-shadow? 
+          // лучше сделаем через фон самого контейнера
+          videoContainer.style.boxShadow = `0 40px 80px -20px rgba(${r},${g},${b},0.4), 0 0 0 1px rgba(255,255,255,0.05)`;
+        } catch(e) {
+          // CORS или другая ошибка — просто пропускаем
+        }
+      }
+
+      // запуск/остановка анализа в зависимости от состояния
+      function startAmbientLoop() {
+        if (ambientInterval) return;
+        ambientInterval = setInterval(updateAmbientLight, 200); // каждые 200мс
+      }
+
+      function stopAmbientLoop() {
+        if (ambientInterval) {
+          clearInterval(ambientInterval);
+          ambientInterval = null;
+        }
+      }
+
+      video.addEventListener('play', startAmbientLoop);
+      video.addEventListener('pause', () => {
+        // оставляем последнее свечение, но перестаём обновлять
+        stopAmbientLoop();
+      });
+
+      video.addEventListener('loadeddata', () => {
+        if (!video.paused) startAmbientLoop();
+      });
+
+      // при перемотке обновляем цвет сразу
+      video.addEventListener('seeked', () => {
+        if (!video.paused) {
+          updateAmbientLight();
         }
       });
 
-      // загрузка видео
+      // сброс свечения при загрузке нового видео
+      video.addEventListener('loadstart', () => {
+        ambientGlow.style.opacity = '0';
+        videoContainer.style.boxShadow = '0 40px 80px -20px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.05)';
+      });
+
+      // ---------- загрузка файла ----------
       fileInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
-        // проверка типа
         if (!file.type.startsWith('video/')) {
-          alert('Пожалуйста, выберите видеофайл');
+          alert('Выберите видеофайл');
           fileInput.value = '';
           return;
         }
 
-        const fileURL = URL.createObjectURL(file);
-        video.src = fileURL;
+        // освобождаем старый URL
+        if (video.src && video.src.startsWith('blob:')) {
+          URL.revokeObjectURL(video.src);
+        }
+
+        const url = URL.createObjectURL(file);
+        video.src = url;
         video.load();
 
-        // показываем имя файла
-        const fileName = file.name.length > 38 ? file.name.slice(0, 35) + '...' : file.name;
-        fileInfoSpan.innerHTML = `🎬 ${fileName}`;
+        const name = file.name.length > 40 ? file.name.slice(0, 37) + '…' : file.name;
+        fileInfoSpan.textContent = name;
 
-        // сброс слайдера и времени
         seekSlider.value = 0;
-        timeDisplay.textContent = '00:00 / 00:00';
+        timeDisplay.textContent = '0:00 / 0:00';
+        centerPlayOverlay.classList.add('visible');
+        playIcon.style.display = 'block';
+        pauseIcon.style.display = 'none';
 
-        // после загрузки метаданных обновим
-        video.addEventListener('loadedmetadata', function onMeta() {
-          updateProgress();
-          // автозапуск не делаем, чтобы не раздражать
-          video.removeEventListener('loadedmetadata', onMeta);
-        }, { once: true });
-
-        // очищаем старый URL при закрытии страницы (опционально)
-        window.addEventListener('beforeunload', () => {
-          URL.revokeObjectURL(fileURL);
-        }, { once: true });
+        // просим ambient обновиться после загрузки метаданных
+        video.addEventListener('loadeddata', function onLoaded() {
+          if (!video.paused) startAmbientLoop();
+          video.removeEventListener('loadeddata', onLoaded);
+        });
       });
 
-      // клик по видео – play/pause (как в ютубе)
+      // ---------- клики по видео ----------
       video.addEventListener('click', togglePlayPause);
 
-      // если видео нет – показываем заглушку
-      video.addEventListener('error', () => {
-        if (video.src) {
-          fileInfoSpan.innerHTML = '⚠️ ошибка загрузки видео';
-        }
-      });
-
-      // показываем контролы при инициализации, но лучше – по ховеру (уже есть)
-      // для тач-устройств: при клике на контейнер делать контролы видимыми
-      videoContainer.addEventListener('click', (e) => {
-        if (e.target === videoContainer || e.target === video) {
-          customControls.classList.add('active');
-          // и убираем через 2 секунды бездействия? 
-          // но лучше полагаться на ховер, а на тач – добавляем временный класс
-        }
-      });
-
-      // маленький хак: на мобильных устройствах убираем active через 3 секунды
+      // на мобильных показываем контролы после тапа
       videoContainer.addEventListener('touchstart', () => {
         customControls.classList.add('active');
+        clearTimeout(videoContainer._touchTimer);
+        videoContainer._touchTimer = setTimeout(() => {
+          if (video.paused) return;
+          customControls.classList.remove('active');
+        }, 3000);
       }, { passive: true });
 
-      // если слайдер трогают, не скрываем контролы
-      seekSlider.addEventListener('mousedown', (e) => e.stopPropagation());
-      volumeSlider.addEventListener('mousedown', (e) => e.stopPropagation());
-
-      // Также сделаем так, чтобы при наведении на контролы они не исчезали
-      customControls.addEventListener('mouseenter', () => {
-        customControls.style.opacity = '1';
-        customControls.style.pointerEvents = 'auto';
+      // скрытие контролов при бездействии (для десктопа)
+      let hideTimer;
+      videoContainer.addEventListener('mousemove', () => {
+        customControls.classList.add('active');
+        clearTimeout(hideTimer);
+        if (!video.paused) {
+          hideTimer = setTimeout(() => customControls.classList.remove('active'), 2500);
+        }
       });
 
-      // предотвращаем скрытие при клике на контролы
+      videoContainer.addEventListener('mouseleave', () => {
+        if (!video.paused) customControls.classList.remove('active');
+      });
+
+      // остановка клика внутри контролов
       customControls.addEventListener('click', (e) => e.stopPropagation());
 
-      // Инициализация иконки play
+      // начальные иконки
       playIcon.style.display = 'block';
       pauseIcon.style.display = 'none';
 
-      // обнуляем URL при перезагрузке – не обязательно, но чисто
+      // очистка при уходе со страницы
       window.addEventListener('beforeunload', () => {
-        if (video.src) {
-          URL.revokeObjectURL(video.src);
-        }
+        if (video.src && video.src.startsWith('blob:')) URL.revokeObjectURL(video.src);
+        stopAmbientLoop();
       });
     })();
   </script>
