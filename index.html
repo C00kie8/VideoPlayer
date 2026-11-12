@@ -1,705 +1,1355 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>видеоплеер · ambient light</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      user-select: none;
-    }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#08090d">
+<title>VISION PLAYER — Premium Video Experience</title>
 
-    html, body {
-      width: 100%;
-      height: 100%;
-    }
+<style>
+:root {
+  --red: #ff304f;
+  --bg: #08090d;
+  --glass: rgba(20,22,30,.76);
+  --white: #fff;
+}
 
-    body {
-      background: #000;
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      padding: 40px 20px;
-      overflow: hidden;
-      position: relative;
-    }
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  user-select: none;
+}
 
-    /* ---------- AMBIENT LIGHT (свечение от видео, как на YouTube) ---------- */
-    .ambient-wrapper {
-      position: absolute;
-      inset: 0;
-      overflow: hidden;
-      z-index: 0;
-      pointer-events: none;
-    }
+body {
+  min-height: 100vh;
+  background: var(--bg);
+  color: white;
+  font-family: Inter, system-ui, sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 30px;
+  overflow-x: hidden;
+}
 
-    /* слой со свечением, который растягивается и размывается */
-    .ambient-glow {
-      position: absolute;
-      inset: -20%;
-      background-size: cover;
-      background-position: center;
-      filter: blur(120px) saturate(220%) brightness(0.85);
-      opacity: 0;
-      transform: scale(1.15);
-      transition: opacity 0.8s ease;
-      will-change: opacity, background-image;
-    }
+/* AMBIENT BACKGROUND */
 
-    /* затемняющая вуаль, чтобы свечение не было слишком ярким */
-    .ambient-overlay {
-      position: absolute;
-      inset: 0;
-      background: radial-gradient(
-        ellipse at center,
-        rgba(0, 0, 0, 0.1) 0%,
-        rgba(0, 0, 0, 0.55) 60%,
-        rgba(0, 0, 0, 0.92) 100%
-      );
-      z-index: 1;
-      pointer-events: none;
-    }
+.ambient {
+  position: fixed;
+  inset: -20%;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+  filter: blur(120px) saturate(200%);
+  transform: scale(1.2);
+  transition: opacity 1s;
+  background: radial-gradient(
+    ellipse,
+    #373b66,
+    transparent 65%
+  );
+}
 
-    /* ---------- ПЛЕЕР ---------- */
-    .player-card {
-      width: 100%;
-      max-width: 1200px;
-      position: relative;
-      z-index: 2;
-      transition: transform 0.3s ease;
-    }
+.ambient.visible {
+  opacity: .65;
+}
 
-    .video-container {
-      position: relative;
-      border-radius: 20px;
-      overflow: hidden;
-      background: #0a0a0a;
-      box-shadow:
-        0 40px 80px -20px rgba(0, 0, 0, 0.9),
-        0 0 0 1px rgba(255, 255, 255, 0.05);
-      aspect-ratio: 16 / 9;
-    }
+.dark-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 0%,
+    rgba(0,0,0,.45) 70%,
+    #000 120%
+  );
+}
 
-    video {
-      display: block;
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      background: #000;
-      outline: none;
-    }
+/* PLAYER */
 
-    /* ---------- КАСТОМНЫЕ КОНТРОЛЫ ---------- */
-    .custom-controls {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: linear-gradient(to top, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.6) 50%, transparent 100%);
-      padding: 40px 20px 16px 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      opacity: 0;
-      transition: opacity 0.25s ease;
-      pointer-events: none;
-      z-index: 10;
-    }
+.player {
+  width: 100%;
+  max-width: 1250px;
+  position: relative;
+  z-index: 2;
+}
 
-    .video-container:hover .custom-controls,
-    .custom-controls.active,
-    .video-container:focus-within .custom-controls {
-      opacity: 1;
-      pointer-events: auto;
-    }
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  padding: 0 5px;
+}
 
-    /* прогресс-бар */
-    .progress-area {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-    }
+.logo {
+  font-size: 19px;
+  font-weight: 900;
+  letter-spacing: 3px;
+}
 
-    .time-display {
-      font-size: 13px;
-      font-weight: 500;
-      color: #fff;
-      letter-spacing: 0.3px;
-      white-space: nowrap;
-      font-variant-numeric: tabular-nums;
-      opacity: 0.9;
-      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
-    }
+.logo span {
+  color: var(--red);
+}
 
-    .progress-slider-container {
-      flex: 1;
-      position: relative;
-      display: flex;
-      align-items: center;
-    }
+.status {
+  color: #888;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
 
-    input[type="range"] {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 100%;
-      height: 4px;
-      background: rgba(255, 255, 255, 0.25);
-      border-radius: 20px;
-      outline: none;
-      cursor: pointer;
-      transition: height 0.15s;
-    }
+.stage {
+  width: 100%;
+  aspect-ratio: 16/9;
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  background: #000;
+  border: 1px solid rgba(255,255,255,.1);
+  box-shadow: 0 35px 100px rgba(0,0,0,.8);
+  isolation: isolate;
+  transition: box-shadow .5s;
+}
 
-    input[type="range"]:hover {
-      height: 6px;
-    }
+.stage video {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  background: #000;
+}
 
-    input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 14px;
-      height: 14px;
-      background: #ff0000;
-      border-radius: 50%;
-      transition: transform 0.15s, box-shadow 0.15s;
-      border: none;
-      cursor: pointer;
-      box-shadow: 0 0 8px rgba(255, 0, 0, 0.6);
-    }
+#vrCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: none;
+  z-index: 4;
+  touch-action: none;
+}
 
-    input[type="range"]::-webkit-slider-thumb:hover {
-      transform: scale(1.4);
-      box-shadow: 0 0 14px rgba(255, 0, 0, 0.9);
-    }
+.stage.vr-mode #vrCanvas {
+  display: block;
+}
 
-    input[type="range"]::-moz-range-thumb {
-      width: 14px;
-      height: 14px;
-      background: #ff0000;
-      border-radius: 50%;
-      border: none;
-      cursor: pointer;
-    }
+.stage.vr-mode video {
+  visibility: hidden;
+}
 
-    /* панель кнопок */
-    .buttons-panel {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-    }
+/* CENTER PLAY */
 
-    .left-buttons, .right-buttons {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
+.center-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 5;
+  pointer-events: none;
+  transition: opacity .3s;
+}
 
-    .icon-btn {
-      background: transparent;
-      border: none;
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      color: #fff;
-      transition: background 0.2s, transform 0.15s;
-      outline: none;
-      flex-shrink: 0;
-    }
+.center-overlay.hidden {
+  opacity: 0;
+}
 
-    .icon-btn:hover {
-      background: rgba(255, 255, 255, 0.15);
-      transform: scale(1.05);
-    }
+.center-play {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.3);
+  backdrop-filter: blur(20px);
+  color: white;
+  font-size: 32px;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: .25s;
+}
 
-    .icon-btn:active {
-      transform: scale(0.92);
-    }
+.center-play:hover {
+  background: var(--red);
+  transform: scale(1.12);
+  box-shadow: 0 0 45px rgba(255,48,79,.4);
+}
 
-    .icon-btn svg {
-      width: 22px;
-      height: 22px;
-      fill: currentColor;
-      display: block;
-    }
+/* CONTROLS */
 
-    /* большая кнопка play по центру */
-    .center-play-overlay {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      pointer-events: none;
-      z-index: 5;
-      opacity: 0;
-      transition: opacity 0.3s;
-    }
+.controls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  padding: 65px 22px 18px;
+  background: linear-gradient(
+    transparent,
+    rgba(0,0,0,.78) 40%,
+    rgba(0,0,0,.96)
+  );
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .3s;
+}
 
-    .center-play-overlay.visible {
-      opacity: 1;
-    }
+.stage:hover .controls,
+.controls.active,
+.stage:focus-within .controls {
+  opacity: 1;
+  pointer-events: auto;
+}
 
-    .center-play-btn {
-      width: 80px;
-      height: 80px;
-      border-radius: 50%;
-      background: rgba(0, 0, 0, 0.65);
-      backdrop-filter: blur(10px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      pointer-events: auto;
-      border: 2px solid rgba(255, 255, 255, 0.25);
-      transition: transform 0.2s, background 0.2s;
-    }
+/* PROGRESS */
 
-    .center-play-btn:hover {
-      background: rgba(255, 0, 0, 0.85);
-      transform: scale(1.08);
-    }
+.progress-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
 
-    .center-play-btn svg {
-      width: 38px;
-      height: 38px;
-      fill: #fff;
-      margin-left: 4px;
-    }
+.time {
+  font-size: 12px;
+  color: white;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 
-    /* кнопка загрузки */
-    .upload-label {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      padding: 0 18px;
-      height: 40px;
-      border-radius: 40px;
-      font-weight: 500;
-      font-size: 14px;
-      color: #fff;
-      cursor: pointer;
-      transition: all 0.2s;
-      white-space: nowrap;
-    }
+.progress {
+  flex: 1;
+  height: 5px;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
 
-    .upload-label:hover {
-      background: #ff0000;
-      border-color: #ff0000;
-      transform: scale(1.03);
-    }
+.progress input {
+  width: 100%;
+  appearance: none;
+  height: 4px;
+  border-radius: 20px;
+  outline: none;
+  cursor: pointer;
+  background: linear-gradient(
+    to right,
+    var(--red) 0%,
+    var(--red) 0%,
+    rgba(255,255,255,.3) 0%
+  );
+}
 
-    .upload-label svg {
-      width: 18px;
-      height: 18px;
-      fill: white;
-    }
+.progress input::-webkit-slider-thumb {
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  background: var(--red);
+  border-radius: 50%;
+  box-shadow: 0 0 12px var(--red);
+}
 
-    #fileInput {
-      display: none;
-    }
+.progress input::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  background: var(--red);
+  border: none;
+  border-radius: 50%;
+}
 
-    .volume-slider-container {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 0 8px;
-    }
+/* BUTTONS */
 
-    .volume-slider-container input {
-      width: 70px;
-      height: 4px;
-    }
+.button-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
 
-    .volume-slider-container input::-webkit-slider-thumb {
-      width: 12px;
-      height: 12px;
-    }
+.group {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
 
-    /* имя файла */
-    .file-info {
-      font-size: 13px;
-      color: #888;
-      margin-top: 12px;
-      padding-left: 4px;
-      overflow: hidden;
-      white-space: nowrap;
-      text-overflow: ellipsis;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+.btn {
+  min-width: 40px;
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 12px;
+  background: rgba(255,255,255,.07);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: .2s;
+  backdrop-filter: blur(15px);
+}
 
-    /* скрываем нативные контролы */
-    video::-webkit-media-controls,
-    video::-webkit-media-controls-enclosure {
-      display: none !important;
-    }
+.btn svg {
+  width: 19px;
+  height: 19px;
+  fill: currentColor;
+}
 
-    /* мобильная адаптация */
-    @media (max-width: 700px) {
-      body { padding: 12px 8px; }
-      .video-container { border-radius: 12px; }
-      .custom-controls { padding: 30px 10px 8px 10px; gap: 6px; }
-      .icon-btn { width: 34px; height: 34px; }
-      .icon-btn svg { width: 18px; height: 18px; }
-      .upload-label { padding: 0 12px; height: 34px; font-size: 12px; }
-      .upload-label svg { width: 14px; height: 14px; }
-      .time-display { font-size: 11px; }
-      .volume-slider-container { display: none; }
-      .center-play-btn { width: 60px; height: 60px; }
-      .center-play-btn svg { width: 28px; height: 28px; }
-      .ambient-glow { filter: blur(60px) saturate(200%); }
-    }
-  </style>
+.btn:hover {
+  background: rgba(255,255,255,.2);
+  border-color: rgba(255,255,255,.3);
+  transform: translateY(-2px);
+}
+
+.btn:active {
+  transform: scale(.94);
+}
+
+.btn.active {
+  color: var(--red);
+  background: rgba(255,48,79,.14);
+  border-color: rgba(255,48,79,.5);
+}
+
+.btn.primary {
+  background: var(--red);
+  border-color: var(--red);
+}
+
+.btn.primary:hover {
+  background: #ff526a;
+  box-shadow: 0 0 20px rgba(255,48,79,.35);
+}
+
+.volume {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+}
+
+.volume input {
+  width: 75px;
+  accent-color: var(--red);
+  cursor: pointer;
+}
+
+select {
+  height: 38px;
+  background: rgba(255,255,255,.08);
+  color: white;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 10px;
+  padding: 0 8px;
+  outline: none;
+  cursor: pointer;
+}
+
+select option {
+  background: #151515;
+}
+
+/* VR BADGE */
+
+.vr-badge {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 8;
+  padding: 8px 13px;
+  border-radius: 30px;
+  background: rgba(255,48,79,.85);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  display: none;
+}
+
+.stage.vr-mode .vr-badge {
+  display: block;
+}
+
+/* FILE INFO */
+
+.file-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 17px 5px;
+  color: #888;
+  font-size: 13px;
+  gap: 10px;
+}
+
+.file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upload {
+  height: 42px;
+  padding: 0 20px;
+  border-radius: 12px;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.13);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  color: white;
+  transition: .2s;
+  white-space: nowrap;
+}
+
+.upload:hover {
+  background: var(--red);
+  border-color: var(--red);
+}
+
+#fileInput {
+  display: none;
+}
+
+.hint {
+  text-align: center;
+  font-size: 11px;
+  color: #555;
+  margin-top: 12px;
+}
+
+/* MOBILE */
+
+@media(max-width:700px) {
+  body {
+    padding: 12px 8px;
+  }
+
+  .stage {
+    border-radius: 12px;
+  }
+
+  .controls {
+    padding: 35px 9px 8px;
+  }
+
+  .button-row {
+    gap: 4px;
+  }
+
+  .group {
+    gap: 3px;
+  }
+
+  .btn {
+    min-width: 32px;
+    height: 33px;
+    padding: 0 6px;
+    border-radius: 9px;
+  }
+
+  .btn svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .volume {
+    display: none;
+  }
+
+  .btn span {
+    font-size: 10px;
+  }
+
+  .time {
+    font-size: 10px;
+  }
+
+  .progress-row {
+    gap: 7px;
+    margin-bottom: 7px;
+  }
+
+  .center-play {
+    width: 58px;
+    height: 58px;
+  }
+
+  .logo {
+    font-size: 15px;
+  }
+
+  .status {
+    font-size: 9px;
+  }
+
+  .upload {
+    height: 35px;
+    padding: 0 11px;
+    font-size: 11px;
+  }
+
+  .file-info {
+    font-size: 11px;
+  }
+
+  select {
+    height: 32px;
+    font-size: 10px;
+    max-width: 70px;
+  }
+}
+
+@media(max-width:380px) {
+  .right-group .btn {
+    min-width: 29px;
+  }
+}
+</style>
 </head>
+
 <body>
 
-  <!-- ambient свечение позади плеера -->
-  <div class="ambient-wrapper">
-    <div class="ambient-glow" id="ambientGlow"></div>
-    <div class="ambient-overlay"></div>
-  </div>
+<div class="ambient" id="ambient"></div>
+<div class="dark-overlay"></div>
 
-  <!-- плеер -->
-  <div class="player-card">
-    <div class="video-container" id="videoContainer">
-      <video id="video" preload="metadata" playsinline crossorigin="anonymous"></video>
+<main class="player">
 
-      <!-- большая кнопка play по центру -->
-      <div class="center-play-overlay visible" id="centerPlayOverlay">
-        <div class="center-play-btn" id="centerPlayBtn">
-          <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+  <header class="topbar">
+    <div class="logo">VISION<span>.</span>PLAYER</div>
+    <div class="status">PREMIUM EXPERIENCE</div>
+  </header>
+
+  <section class="stage" id="stage">
+
+    <video id="video" playsinline preload="metadata"></video>
+
+    <canvas id="vrCanvas"></canvas>
+
+    <div class="vr-badge">360° SPHERICAL MODE</div>
+
+    <div class="center-overlay" id="centerOverlay">
+      <button class="center-play" id="centerPlay">▶</button>
+    </div>
+
+    <div class="controls" id="controls">
+
+      <div class="progress-row">
+        <span class="time" id="time">0:00 / 0:00</span>
+
+        <div class="progress">
+          <input
+            type="range"
+            id="seek"
+            min="0"
+            max="100"
+            value="0"
+            step="0.01"
+          >
         </div>
       </div>
 
-      <!-- контролы -->
-      <div class="custom-controls" id="customControls">
-        <div class="progress-area">
-          <span class="time-display" id="timeDisplay">0:00 / 0:00</span>
-          <div class="progress-slider-container">
-            <input type="range" id="seekSlider" min="0" max="100" value="0" step="0.01">
+      <div class="button-row">
+
+        <div class="group">
+
+          <button class="btn" id="playBtn" title="Play / Pause">
+            <svg id="playIcon" viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+            <svg id="pauseIcon" viewBox="0 0 24 24" style="display:none">
+              <path d="M6 5h4v14H6zm8 0h4v14h-4z"/>
+            </svg>
+          </button>
+
+          <button class="btn" id="backBtn" title="Назад 5 секунд">
+            ↶5
+          </button>
+
+          <button class="btn" id="nextBtn" title="Вперёд 5 секунд">
+            5↷
+          </button>
+
+          <div class="volume">
+            <span>♪</span>
+            <input id="volume" type="range" min="0" max="1"
+              step="0.01" value="1">
           </div>
+
         </div>
 
-        <div class="buttons-panel">
-          <div class="left-buttons">
-            <button class="icon-btn" id="playPauseBtn" title="play/pause">
-              <svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-              <svg id="pauseIcon" style="display:none;" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-            </button>
-            <button class="icon-btn" id="rewindBtn" title="назад 5 сек">
-              <svg viewBox="0 0 24 24"><path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/></svg>
-            </button>
-            <button class="icon-btn" id="forwardBtn" title="вперёд 5 сек">
-              <svg viewBox="0 0 24 24"><path d="M13 6v12l8.5-6-8.5-6zM4 18l8.5-6L4 6v12z"/></svg>
-            </button>
-            <div class="volume-slider-container">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="#fff" style="opacity:0.85;">
-                <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
-              </svg>
-              <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="1">
-            </div>
-          </div>
+        <div class="group right-group">
 
-          <div class="right-buttons">
-            <button class="icon-btn" id="fullscreenBtn" title="полный экран">
-              <svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
-            </button>
-            <label for="fileInput" class="upload-label">
-              <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></svg>
-              загрузить
-            </label>
-            <input type="file" id="fileInput" accept="video/*">
-          </div>
+          <button class="btn" id="loopBtn" title="Повтор видео">
+            <svg viewBox="0 0 24 24">
+              <path d="M17 2l4 4-4 4V7H7a3 3 0 0 0-3 3v2H2v-2a5 5 0 0 1 5-5h10V2zM7 22l-4-4 4-4v3h10a3 3 0 0 0 3-3v-2h2v2a5 5 0 0 1-5 5H7v3z"/>
+            </svg>
+          </button>
+
+          <select id="speed" title="Скорость">
+            <option value=".25">0.25×</option>
+            <option value=".5">0.5×</option>
+            <option value=".75">0.75×</option>
+            <option value="1" selected>1×</option>
+            <option value="1.25">1.25×</option>
+            <option value="1.5">1.5×</option>
+            <option value="1.75">1.75×</option>
+            <option value="2">2×</option>
+          </select>
+
+          <button class="btn" id="vrBtn" title="360° режим">
+            360°
+          </button>
+
+          <button class="btn" id="webxrBtn" title="VR Headset">
+            VR
+          </button>
+
+          <button class="btn" id="fullscreenBtn" title="Полный экран">
+            ⛶
+          </button>
+
         </div>
       </div>
     </div>
 
-    <div class="file-info" id="fileInfo">
-      <span>файл не выбран</span>
+  </section>
+
+  <div class="file-info">
+    <div class="file-name" id="fileName">
+      Видео не выбрано
     </div>
+
+    <label class="upload" for="fileInput">
+      ＋ Загрузить видео
+    </label>
+
+    <input type="file" id="fileInput" accept="video/*">
   </div>
 
-  <script>
-    (function() {
-      const video = document.getElementById('video');
-      const playPauseBtn = document.getElementById('playPauseBtn');
-      const playIcon = document.getElementById('playIcon');
-      const pauseIcon = document.getElementById('pauseIcon');
-      const seekSlider = document.getElementById('seekSlider');
-      const timeDisplay = document.getElementById('timeDisplay');
-      const fileInput = document.getElementById('fileInput');
-      const fileInfoSpan = document.querySelector('#fileInfo span');
-      const rewindBtn = document.getElementById('rewindBtn');
-      const forwardBtn = document.getElementById('forwardBtn');
-      const fullscreenBtn = document.getElementById('fullscreenBtn');
-      const volumeSlider = document.getElementById('volumeSlider');
-      const customControls = document.getElementById('customControls');
-      const videoContainer = document.getElementById('videoContainer');
-      const ambientGlow = document.getElementById('ambientGlow');
-      const centerPlayOverlay = document.getElementById('centerPlayOverlay');
-      const centerPlayBtn = document.getElementById('centerPlayBtn');
+  <div class="hint">
+    SPACE — PLAY/PAUSE · ← → — SEEK · L — LOOP · F — FULLSCREEN · M — MUTE
+  </div>
 
-      // ---------- форматы времени ----------
-      function formatTime(seconds) {
-        if (isNaN(seconds) || seconds < 0) return '0:00';
-        const h = Math.floor(seconds / 3600);
-        const m = Math.floor((seconds % 3600) / 60);
-        const s = Math.floor(seconds % 60);
-        if (h > 0) return `${h}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
-        return `${m}:${s.toString().padStart(2,'0')}`;
+</main>
+
+<script type="module">
+
+import * as THREE from
+'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+/* ==================================
+   ELEMENTS
+================================== */
+
+const video = document.getElementById('video');
+const stage = document.getElementById('stage');
+const canvas = document.getElementById('vrCanvas');
+
+const ambient = document.getElementById('ambient');
+
+const controls = document.getElementById('controls');
+const overlay = document.getElementById('centerOverlay');
+
+const playBtn = document.getElementById('playBtn');
+const centerPlay = document.getElementById('centerPlay');
+
+const playIcon = document.getElementById('playIcon');
+const pauseIcon = document.getElementById('pauseIcon');
+
+const seek = document.getElementById('seek');
+const time = document.getElementById('time');
+
+const volume = document.getElementById('volume');
+const speed = document.getElementById('speed');
+
+const loopBtn = document.getElementById('loopBtn');
+const vrBtn = document.getElementById('vrBtn');
+const webxrBtn = document.getElementById('webxrBtn');
+
+const fullscreenBtn = document.getElementById('fullscreenBtn');
+
+const fileInput = document.getElementById('fileInput');
+const fileName = document.getElementById('fileName');
+
+/* ==================================
+   STATE
+================================== */
+
+let objectURL = null;
+let hideTimer = null;
+let ambientFrame = null;
+let lastAmbient = 0;
+
+let vrActive = false;
+let dragging = false;
+
+let lon = 0;
+let lat = 0;
+
+let pointerX = 0;
+let pointerY = 0;
+
+/* ==================================
+   TIME
+================================== */
+
+function formatTime(seconds) {
+  if (!Number.isFinite(seconds) || seconds < 0) {
+    return '0:00';
+  }
+
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor(seconds % 3600 / 60);
+  const s = Math.floor(seconds % 60);
+
+  if (h > 0) {
+    return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }
+
+  return `${m}:${String(s).padStart(2,'0')}`;
+}
+
+function updateProgress() {
+  const duration = video.duration;
+
+  if (!Number.isFinite(duration) || duration <= 0) {
+    time.textContent = '0:00 / 0:00';
+    seek.value = 0;
+    return;
+  }
+
+  const percent = video.currentTime / duration * 100;
+
+  seek.value = percent;
+
+  seek.style.background = `
+    linear-gradient(
+      to right,
+      #ff304f ${percent}%,
+      rgba(255,255,255,.3) ${percent}%
+    )
+  `;
+
+  time.textContent =
+    `${formatTime(video.currentTime)} / ${formatTime(duration)}`;
+}
+
+video.addEventListener('timeupdate', updateProgress);
+video.addEventListener('loadedmetadata', updateProgress);
+video.addEventListener('durationchange', updateProgress);
+
+seek.addEventListener('input', () => {
+  if (Number.isFinite(video.duration)) {
+    video.currentTime = Number(seek.value) / 100 * video.duration;
+  }
+});
+
+/* ==================================
+   PLAY / PAUSE
+================================== */
+
+async function togglePlay() {
+  if (!video.src) return;
+
+  if (video.paused) {
+    try {
+      await video.play();
+    } catch (error) {
+      console.warn('Playback error:', error);
+    }
+  } else {
+    video.pause();
+  }
+}
+
+playBtn.addEventListener('click', togglePlay);
+centerPlay.addEventListener('click', togglePlay);
+
+video.addEventListener('click', () => {
+  if (!vrActive) togglePlay();
+});
+
+video.addEventListener('play', () => {
+  playIcon.style.display = 'none';
+  pauseIcon.style.display = 'block';
+  overlay.classList.add('hidden');
+  startAmbient();
+});
+
+video.addEventListener('pause', () => {
+  playIcon.style.display = 'block';
+  pauseIcon.style.display = 'none';
+  overlay.classList.remove('hidden');
+  stopAmbient();
+});
+
+video.addEventListener('ended', () => {
+  if (!video.loop) {
+    overlay.classList.remove('hidden');
+  }
+});
+
+/* ==================================
+   LOOP
+================================== */
+
+loopBtn.addEventListener('click', () => {
+  video.loop = !video.loop;
+
+  loopBtn.classList.toggle('active', video.loop);
+
+  loopBtn.title = video.loop
+    ? 'Повтор включён'
+    : 'Повтор выключен';
+});
+
+/* ==================================
+   SEEK
+================================== */
+
+document.getElementById('backBtn').addEventListener('click', () => {
+  if (Number.isFinite(video.duration)) {
+    video.currentTime = Math.max(0, video.currentTime - 5);
+  }
+});
+
+document.getElementById('nextBtn').addEventListener('click', () => {
+  if (Number.isFinite(video.duration)) {
+    video.currentTime = Math.min(
+      video.duration,
+      video.currentTime + 5
+    );
+  }
+});
+
+/* ==================================
+   VOLUME
+================================== */
+
+volume.addEventListener('input', () => {
+  video.volume = Number(volume.value);
+  video.muted = video.volume === 0;
+});
+
+speed.addEventListener('change', () => {
+  video.playbackRate = Number(speed.value);
+});
+
+/* ==================================
+   FULLSCREEN
+================================== */
+
+fullscreenBtn.addEventListener('click', async () => {
+  try {
+    if (!document.fullscreenElement) {
+      await stage.requestFullscreen();
+    } else {
+      await document.exitFullscreen();
+    }
+  } catch (error) {
+    console.warn('Fullscreen unavailable:', error);
+  }
+});
+
+/* ==================================
+   AMBIENT LIGHT
+================================== */
+
+const sampleCanvas = document.createElement('canvas');
+
+sampleCanvas.width = 32;
+sampleCanvas.height = 18;
+
+const sampleCtx = sampleCanvas.getContext('2d', {
+  willReadFrequently: true
+});
+
+function updateAmbient() {
+  if (video.paused || !video.videoWidth) return;
+
+  try {
+    sampleCtx.drawImage(
+      video,
+      0, 0,
+      sampleCanvas.width,
+      sampleCanvas.height
+    );
+
+    const pixels = sampleCtx.getImageData(
+      0, 0,
+      sampleCanvas.width,
+      sampleCanvas.height
+    ).data;
+
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    let count = 0;
+
+    for (let i = 0; i < pixels.length; i += 16) {
+      r += pixels[i];
+      g += pixels[i + 1];
+      b += pixels[i + 2];
+      count++;
+    }
+
+    r = Math.round(r / count);
+    g = Math.round(g / count);
+    b = Math.round(b / count);
+
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+
+    const boost = 1.45;
+
+    if (max > 0) {
+      r = Math.min(255, Math.round((r - min) * boost + min));
+      g = Math.min(255, Math.round((g - min) * boost + min));
+      b = Math.min(255, Math.round((b - min) * boost + min));
+    }
+
+    ambient.style.background = `
+      radial-gradient(
+        ellipse at center,
+        rgb(${r},${g},${b}) 0%,
+        rgba(${r},${g},${b},.45) 35%,
+        transparent 75%
+      )
+    `;
+
+    stage.style.boxShadow = `
+      0 35px 100px rgba(0,0,0,.8),
+      0 0 65px rgba(${r},${g},${b},.2)
+    `;
+
+    ambient.classList.add('visible');
+
+  } catch (error) {
+    // Некоторые защищённые видеопотоки запрещают чтение кадров.
+  }
+}
+
+function ambientLoop(now) {
+  if (now - lastAmbient > 300) {
+    updateAmbient();
+    lastAmbient = now;
+  }
+
+  ambientFrame = requestAnimationFrame(ambientLoop);
+}
+
+function startAmbient() {
+  if (ambientFrame !== null) return;
+  ambientFrame = requestAnimationFrame(ambientLoop);
+}
+
+function stopAmbient() {
+  if (ambientFrame !== null) {
+    cancelAnimationFrame(ambientFrame);
+    ambientFrame = null;
+  }
+}
+
+/* ==================================
+   360 SPHERICAL VIDEO
+================================== */
+
+const scene = new THREE.Scene();
+
+const camera = new THREE.PerspectiveCamera(
+  75,
+  16 / 9,
+  0.1,
+  1100
+);
+
+camera.position.set(0, 0, 0.01);
+
+const renderer = new THREE.WebGLRenderer({
+  canvas,
+  antialias: true,
+  alpha: false
+});
+
+renderer.setPixelRatio(
+  Math.min(window.devicePixelRatio, 2)
+);
+
+renderer.setSize(
+  stage.clientWidth,
+  stage.clientHeight
+);
+
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+renderer.xr.enabled = true;
+renderer.xr.setReferenceSpaceType('local-floor');
+
+const geometry = new THREE.SphereGeometry(
+  500,
+  64,
+  48
+);
+
+geometry.scale(-1, 1, 1);
+
+const texture = new THREE.VideoTexture(video);
+
+texture.colorSpace = THREE.SRGBColorSpace;
+
+const material = new THREE.MeshBasicMaterial({
+  map: texture
+});
+
+const sphere = new THREE.Mesh(geometry, material);
+
+scene.add(sphere);
+
+function resizeRenderer() {
+  const width = stage.clientWidth;
+  const height = stage.clientHeight;
+
+  camera.aspect = width / height;
+  camera.updateProjectionMatrix();
+
+  renderer.setSize(width, height);
+}
+
+const resizeObserver = new ResizeObserver(resizeRenderer);
+resizeObserver.observe(stage);
+
+/* CAMERA LOOK */
+
+function updateCamera() {
+  if (renderer.xr.isPresenting) return;
+
+  const phi = THREE.MathUtils.degToRad(90 - lat);
+  const theta = THREE.MathUtils.degToRad(lon);
+
+  camera.lookAt(
+    500 * Math.sin(phi) * Math.cos(theta),
+    500 * Math.cos(phi),
+    500 * Math.sin(phi) * Math.sin(theta)
+  );
+}
+
+/* RENDER LOOP */
+
+renderer.setAnimationLoop(() => {
+  if (!vrActive && !renderer.xr.isPresenting) return;
+
+  updateCamera();
+
+  renderer.render(scene, camera);
+});
+
+/* MOUSE / TOUCH */
+
+canvas.addEventListener('pointerdown', event => {
+  if (!vrActive || renderer.xr.isPresenting) return;
+
+  dragging = true;
+
+  pointerX = event.clientX;
+  pointerY = event.clientY;
+
+  canvas.setPointerCapture(event.pointerId);
+});
+
+canvas.addEventListener('pointermove', event => {
+  if (!dragging) return;
+
+  lon -= (event.clientX - pointerX) * .15;
+  lat += (event.clientY - pointerY) * .15;
+
+  lat = Math.max(-85, Math.min(85, lat));
+
+  pointerX = event.clientX;
+  pointerY = event.clientY;
+});
+
+function stopDragging() {
+  dragging = false;
+}
+
+canvas.addEventListener('pointerup', stopDragging);
+canvas.addEventListener('pointercancel', stopDragging);
+
+canvas.addEventListener('wheel', event => {
+  if (!vrActive || renderer.xr.isPresenting) return;
+
+  camera.fov += event.deltaY * .035;
+
+  camera.fov = Math.max(35, Math.min(100, camera.fov));
+
+  camera.updateProjectionMatrix();
+});
+
+/* ==================================
+   360 MODE
+================================== */
+
+function enter360() {
+  if (!video.src || !video.videoWidth) {
+    alert('Сначала загрузите видео!');
+    return;
+  }
+
+  vrActive = true;
+
+  stage.classList.add('vr-mode');
+  vrBtn.classList.add('active');
+
+  controls.classList.add('active');
+
+  updateCamera();
+}
+
+function exit360() {
+  if (renderer.xr.isPresenting) return;
+
+  vrActive = false;
+
+  stage.classList.remove('vr-mode');
+  vrBtn.classList.remove('active');
+}
+
+vrBtn.addEventListener('click', () => {
+  if (vrActive) {
+    exit360();
+  } else {
+    enter360();
+  }
+});
+
+/* ==================================
+   REAL WEBXR HEADSET
+================================== */
+
+webxrBtn.addEventListener('click', async () => {
+
+  if (!video.src || !video.videoWidth) {
+    alert('Сначала загрузите видео!');
+    return;
+  }
+
+  if (!navigator.xr) {
+    alert('WebXR не поддерживается этим браузером. Откройте страницу через HTTPS на совместимом VR-устройстве.');
+    return;
+  }
+
+  try {
+    const supported = await navigator.xr.isSessionSupported(
+      'immersive-vr'
+    );
+
+    if (!supported) {
+      alert('Совместимый VR-режим не найден.');
+      return;
+    }
+
+    if (!vrActive) {
+      enter360();
+    }
+
+    if (video.paused) {
+      await video.play();
+    }
+
+    const session = await navigator.xr.requestSession(
+      'immersive-vr',
+      {
+        optionalFeatures: [
+          'local-floor',
+          'bounded-floor'
+        ]
       }
+    );
 
-      function updateProgress() {
-        if (!video.duration || isNaN(video.duration)) {
-          timeDisplay.textContent = '0:00 / 0:00';
-          seekSlider.value = 0;
-          return;
-        }
-        const percent = (video.currentTime / video.duration) * 100;
-        seekSlider.value = percent;
-        timeDisplay.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
-      }
+    await renderer.xr.setSession(session);
 
-      seekSlider.addEventListener('input', (e) => {
-        const percent = parseFloat(e.target.value);
-        if (video.duration && !isNaN(video.duration)) {
-          video.currentTime = (percent / 100) * video.duration;
-        }
-      });
+    webxrBtn.classList.add('active');
 
-      video.addEventListener('timeupdate', updateProgress);
-      video.addEventListener('loadedmetadata', updateProgress);
-      video.addEventListener('durationchange', updateProgress);
-      video.addEventListener('seeked', updateProgress);
+    session.addEventListener('end', () => {
+      webxrBtn.classList.remove('active');
+    });
 
-      // ---------- play/pause ----------
-      function togglePlayPause() {
-        if (video.paused) video.play().catch(()=>{});
-        else video.pause();
-      }
+  } catch (error) {
+    console.error('WebXR:', error);
 
-      playPauseBtn.addEventListener('click', togglePlayPause);
-      centerPlayBtn.addEventListener('click', togglePlayPause);
+    alert(
+      'Не удалось запустить VR. Проверьте HTTPS, браузер и подключение шлема.'
+    );
+  }
+});
 
-      video.addEventListener('play', () => {
-        playIcon.style.display = 'none';
-        pauseIcon.style.display = 'block';
-        centerPlayOverlay.classList.remove('visible');
-      });
+/* ==================================
+   FILE UPLOAD
+================================== */
 
-      video.addEventListener('pause', () => {
-        playIcon.style.display = 'block';
-        pauseIcon.style.display = 'none';
-        if (video.src) centerPlayOverlay.classList.add('visible');
-      });
+fileInput.addEventListener('change', async event => {
+  const file = event.target.files[0];
 
-      // ---------- перемотка ----------
-      rewindBtn.addEventListener('click', () => {
-        video.currentTime = Math.max(0, video.currentTime - 5);
-      });
-      forwardBtn.addEventListener('click', () => {
-        if (video.duration) video.currentTime = Math.min(video.duration, video.currentTime + 5);
-      });
+  if (!file) return;
 
-      // ---------- fullscreen ----------
-      fullscreenBtn.addEventListener('click', () => {
-        if (!document.fullscreenElement) {
-          const el = videoContainer;
-          (el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen).call(el);
-        } else {
-          (document.exitFullscreen || document.webkitExitFullscreen).call(document);
-        }
-      });
+  if (!file.type.startsWith('video/')) {
+    alert('Выберите видеофайл!');
+    fileInput.value = '';
+    return;
+  }
 
-      // ---------- громкость ----------
-      volumeSlider.addEventListener('input', (e) => {
-        video.volume = parseFloat(e.target.value);
-        video.muted = (video.volume === 0);
-      });
+  if (renderer.xr.isPresenting) {
+    await renderer.xr.getSession()?.end();
+  }
 
-      // ---------- AMBIENT LIGHT (YouTube-стиль) ----------
-      const ambientCanvas = document.createElement('canvas');
-      const ambientCtx = ambientCanvas.getContext('2d', { willReadFrequently: true });
-      let ambientInterval = null;
-      let lastGlowUpdate = 0;
+  stopAmbient();
 
-      function updateAmbientLight() {
-        if (!video.videoWidth || !video.videoHeight) return;
-        if (video.paused && video.currentTime === 0) return;
+  video.pause();
 
-        // уменьшенная копия кадра для анализа
-        ambientCanvas.width = 32;
-        ambientCanvas.height = 18;
+  if (objectURL) {
+    URL.revokeObjectURL(objectURL);
+    objectURL = null;
+  }
 
-        try {
-          // рисуем кадр видео на канвасе
-          ambientCtx.drawImage(video, 0, 0, ambientCanvas.width, ambientCanvas.height);
+  objectURL = URL.createObjectURL(file);
 
-          // берём средний цвет через downscale
-          const imageData = ambientCtx.getImageData(0, 0, ambientCanvas.width, ambientCanvas.height);
-          const data = imageData.data;
+  video.src = objectURL;
+  video.load();
 
-          let r = 0, g = 0, b = 0;
-          const count = data.length / 4;
-          // берём не все пиксели, для скорости — каждый 4-й
-          let sampled = 0;
-          for (let i = 0; i < data.length; i += 16) { // шаг 4 пикселя
-            r += data[i];
-            g += data[i+1];
-            b += data[i+2];
-            sampled++;
-          }
-          r = Math.round(r / sampled);
-          g = Math.round(g / sampled);
-          b = Math.round(b / sampled);
+  fileName.textContent = file.name;
 
-          // немного усиливаем насыщенность
-          const max = Math.max(r, g, b);
-          const min = Math.min(r, g, b);
-          const satBoost = 1.4;
-          if (max > 0) {
-            r = Math.min(255, Math.round((r - min) * satBoost + min));
-            g = Math.min(255, Math.round((g - min) * satBoost + min));
-            b = Math.min(255, Math.round((b - min) * satBoost + min));
-          }
+  video.currentTime = 0;
 
-          // устанавливаем цвет свечения (радиальное свечение + сам цвет)
-          ambientGlow.style.background = `radial-gradient(ellipse at center, rgb(${r},${g},${b}) 0%, rgba(${r},${g},${b},0.4) 40%, transparent 75%)`;
-          ambientGlow.style.opacity = '0.85';
+  seek.value = 0;
+  updateProgress();
 
-          // также создаём псевдо-свечение по краям через box-shadow? 
-          // лучше сделаем через фон самого контейнера
-          videoContainer.style.boxShadow = `0 40px 80px -20px rgba(${r},${g},${b},0.4), 0 0 0 1px rgba(255,255,255,0.05)`;
-        } catch(e) {
-          // CORS или другая ошибка — просто пропускаем
-        }
-      }
+  video.loop = loopBtn.classList.contains('active');
 
-      // запуск/остановка анализа в зависимости от состояния
-      function startAmbientLoop() {
-        if (ambientInterval) return;
-        ambientInterval = setInterval(updateAmbientLight, 200); // каждые 200мс
-      }
+  overlay.classList.remove('hidden');
 
-      function stopAmbientLoop() {
-        if (ambientInterval) {
-          clearInterval(ambientInterval);
-          ambientInterval = null;
-        }
-      }
+  exit360();
 
-      video.addEventListener('play', startAmbientLoop);
-      video.addEventListener('pause', () => {
-        // оставляем последнее свечение, но перестаём обновлять
-        stopAmbientLoop();
-      });
+  ambient.classList.remove('visible');
 
-      video.addEventListener('loadeddata', () => {
-        if (!video.paused) startAmbientLoop();
-      });
+  stage.style.boxShadow = '0 35px 100px rgba(0,0,0,.8)';
 
-      // при перемотке обновляем цвет сразу
-      video.addEventListener('seeked', () => {
-        if (!video.paused) {
-          updateAmbientLight();
-        }
-      });
+  try {
+    await video.play();
+  } catch {
+    // Автовоспроизведение может быть запрещено браузером.
+    // Пользователь может нажать Play самостоятельно.
+  }
 
-      // сброс свечения при загрузке нового видео
-      video.addEventListener('loadstart', () => {
-        ambientGlow.style.opacity = '0';
-        videoContainer.style.boxShadow = '0 40px 80px -20px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.05)';
-      });
+  fileInput.value = '';
+});
 
-      // ---------- загрузка файла ----------
-      fileInput.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        if (!file.type.startsWith('video/')) {
-          alert('Выберите видеофайл');
-          fileInput.value = '';
-          return;
-        }
+video.addEventListener('error', () => {
+  if (video.error) {
+    console.error('Video error:', video.error.message);
+  }
+});
 
-        // освобождаем старый URL
-        if (video.src && video.src.startsWith('blob:')) {
-          URL.revokeObjectURL(video.src);
-        }
+/* ==================================
+   KEYBOARD
+================================== */
 
-        const url = URL.createObjectURL(file);
-        video.src = url;
-        video.load();
+document.addEventListener('keydown', event => {
+  if (
+    ['INPUT', 'SELECT', 'TEXTAREA'].includes(
+      document.activeElement.tagName
+    )
+  ) return;
 
-        const name = file.name.length > 40 ? file.name.slice(0, 37) + '…' : file.name;
-        fileInfoSpan.textContent = name;
+  if (event.code === 'Space') {
+    event.preventDefault();
+    togglePlay();
+  }
 
-        seekSlider.value = 0;
-        timeDisplay.textContent = '0:00 / 0:00';
-        centerPlayOverlay.classList.add('visible');
-        playIcon.style.display = 'block';
-        pauseIcon.style.display = 'none';
+  if (event.code === 'ArrowLeft') {
+    video.currentTime = Math.max(0, video.currentTime - 5);
+  }
 
-        // просим ambient обновиться после загрузки метаданных
-        video.addEventListener('loadeddata', function onLoaded() {
-          if (!video.paused) startAmbientLoop();
-          video.removeEventListener('loadeddata', onLoaded);
-        });
-      });
+  if (event.code === 'ArrowRight') {
+    if (Number.isFinite(video.duration)) {
+      video.currentTime = Math.min(
+        video.duration,
+        video.currentTime + 5
+      );
+    }
+  }
 
-      // ---------- клики по видео ----------
-      video.addEventListener('click', togglePlayPause);
+  if (event.key.toLowerCase() === 'l') {
+    loopBtn.click();
+  }
 
-      // на мобильных показываем контролы после тапа
-      videoContainer.addEventListener('touchstart', () => {
-        customControls.classList.add('active');
-        clearTimeout(videoContainer._touchTimer);
-        videoContainer._touchTimer = setTimeout(() => {
-          if (video.paused) return;
-          customControls.classList.remove('active');
-        }, 3000);
-      }, { passive: true });
+  if (event.key.toLowerCase() === 'f') {
+    fullscreenBtn.click();
+  }
 
-      // скрытие контролов при бездействии (для десктопа)
-      let hideTimer;
-      videoContainer.addEventListener('mousemove', () => {
-        customControls.classList.add('active');
-        clearTimeout(hideTimer);
-        if (!video.paused) {
-          hideTimer = setTimeout(() => customControls.classList.remove('active'), 2500);
-        }
-      });
+  if (event.key.toLowerCase() === 'm') {
+    video.muted = !video.muted;
+  }
+});
 
-      videoContainer.addEventListener('mouseleave', () => {
-        if (!video.paused) customControls.classList.remove('active');
-      });
+/* ==================================
+   AUTO HIDE CONTROLS
+================================== */
 
-      // остановка клика внутри контролов
-      customControls.addEventListener('click', (e) => e.stopPropagation());
+function showControls() {
+  controls.classList.add('active');
 
-      // начальные иконки
-      playIcon.style.display = 'block';
-      pauseIcon.style.display = 'none';
+  clearTimeout(hideTimer);
 
-      // очистка при уходе со страницы
-      window.addEventListener('beforeunload', () => {
-        if (video.src && video.src.startsWith('blob:')) URL.revokeObjectURL(video.src);
-        stopAmbientLoop();
-      });
-    })();
-  </script>
+  if (!video.paused) {
+    hideTimer = setTimeout(() => {
+      controls.classList.remove('active');
+    }, 3000);
+  }
+}
+
+stage.addEventListener('mousemove', showControls);
+
+stage.addEventListener('touchstart', showControls, {
+  passive: true
+});
+
+stage.addEventListener('mouseleave', () => {
+  if (!video.paused) {
+    controls.classList.remove('active');
+  }
+});
+
+controls.addEventListener('click', event => {
+  event.stopPropagation();
+});
+
+/* ==================================
+   CLEANUP
+================================== */
+
+window.addEventListener('beforeunload', () => {
+  stopAmbient();
+
+  clearTimeout(hideTimer);
+
+  resizeObserver.disconnect();
+
+  if (objectURL) {
+    URL.revokeObjectURL(objectURL);
+  }
+
+  texture.dispose();
+  material.dispose();
+  geometry.dispose();
+  renderer.dispose();
+});
+
+</script>
+
 </body>
 </html>
